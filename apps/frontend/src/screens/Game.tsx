@@ -111,7 +111,7 @@ export const Game = () => {
             whitePlayer: message.payload.whitePlayer,
           });
 
-          startWebRTC();
+          startWebRTC()
           break;
         case MOVE:
           const { move, player1TimeConsumed, player2TimeConsumed } = message.payload;
@@ -441,7 +441,6 @@ export const Game = () => {
       </div>
       {/* WebRTC video elements */}
       <div className="video-container">
-        <h1></h1>
         <video ref={localVideoRef} autoPlay muted className="local-video"></video>
         <video ref={remoteVideoRef} autoPlay className="remote-video"></video>
       </div>
