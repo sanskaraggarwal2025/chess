@@ -21,11 +21,11 @@ export class User {
 class SocketManager {
   private static instance: SocketManager;
   private interestedSockets: Map<string, User[]>;
-  private userRoomMappping: Map<string, string>;
+  private userRoomMapping: Map<string, string>;
 
   private constructor() {
     this.interestedSockets = new Map<string, User[]>();
-    this.userRoomMappping = new Map<string, string>();
+    this.userRoomMapping = new Map<string, string>();
   }
 
   static getInstance() {
@@ -39,7 +39,7 @@ class SocketManager {
 
   addUser(user: User, roomId: string) {
     this.interestedSockets.set(roomId, [...(this.interestedSockets.get(roomId) || []), user]);
-    this.userRoomMappping.set(user.userId, roomId);
+    this.userRoomMapping.set(user.userId, roomId);
   }
 
   broadcast(roomId: string, message: string) {
@@ -55,7 +55,7 @@ class SocketManager {
   }
 
   removeUser(user: User) {
-    const roomId = this.userRoomMappping.get(user.userId);
+    const roomId = this.userRoomMapping.get(user.userId);
     if (!roomId) {
       console.error('User was not interested in any room?');
       return;
@@ -66,8 +66,9 @@ class SocketManager {
     if (this.interestedSockets.get(roomId)?.length === 0) {
       this.interestedSockets.delete(roomId);
     }
-    this.userRoomMappping.delete(user.userId);
+    this.userRoomMapping.delete(user.userId);
   }
+
 }
 
 export const socketManager = SocketManager.getInstance();

@@ -11,7 +11,12 @@ import MovesTable from '../components/MovesTable';
 import { useUser } from '@repo/store/useUser';
 import { UserAvatar } from '../components/UserAvatar';
 
-// TODO: Move together, there's code repetition here
+// WebRTC constants
+const WEBRTC_OFFER = 'webrtc_offer';
+const WEBRTC_ANSWER = 'webrtc_answer';
+const WEBRTC_CANDIDATE = 'webrtc_candidate';
+
+// Game-related constants
 export const INIT_GAME = 'init_game';
 export const MOVE = 'move';
 export const OPPONENT_DISCONNECTED = 'opponent_disconnected';
@@ -105,6 +110,8 @@ export const Game = () => {
             blackPlayer: message.payload.blackPlayer,
             whitePlayer: message.payload.whitePlayer,
           });
+
+          startWebRTC();
           break;
         case MOVE:
           const { move, player1TimeConsumed, player2TimeConsumed } = message.payload;
@@ -185,6 +192,12 @@ export const Game = () => {
           setPlayer2TimeConsumed(message.payload.player2Time);
           break;
 
+        case WEBRTC_OFFER:
+        case WEBRTC_ANSWER:
+        case WEBRTC_CANDIDATE:
+          handleWebRTCMessage(message);
+          break;
+
         default:
           alert(message.payload.message);
           break;
@@ -215,6 +228,97 @@ export const Game = () => {
       return () => clearInterval(interval);
     }
   }, [started, gameMetadata, user]);
+
+  // WebRTC state
+  const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
+  // WebRTC setup and message handling
+  useEffect(() => {
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ],
+    });
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        socket?.send(
+          JSON.stringify({
+            type: WEBRTC_CANDIDATE,
+            payload: { candidate: event.candidate },
+          })
+        );
+      }
+    };
+
+    pc.ontrack = (event) => {
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+      }
+    };
+
+    setPeerConnection(pc);
+
+    return () => {
+      pc.close();
+    };
+  }, []);
+
+  const handleWebRTCMessage = (message: any) => {
+    switch (message.type) {
+      case WEBRTC_OFFER:
+        peerConnection?.setRemoteDescription(new RTCSessionDescription(message.payload));
+        peerConnection
+          ?.createAnswer()
+          .then((answer) => peerConnection?.setLocalDescription(answer))
+          .then(() => {
+            socket?.send(
+              JSON.stringify({
+                type: WEBRTC_ANSWER,
+                payload: peerConnection?.localDescription,
+              })
+            );
+          });
+        break;
+      case WEBRTC_ANSWER:
+        peerConnection?.setRemoteDescription(new RTCSessionDescription(message.payload));
+        break;
+      case WEBRTC_CANDIDATE:
+        peerConnection?.addIceCandidate(new RTCIceCandidate(message.payload));
+        break;
+      default:
+        break;
+    }
+  };
+
+  const startWebRTC = () => {
+    navigator.mediaDevices
+      .getUserMedia({ video: true, audio: true })
+      .then((stream) => {
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+        stream.getTracks().forEach((track) => {
+          peerConnection?.addTrack(track, stream);
+        });
+
+        peerConnection
+          ?.createOffer()
+          .then((offer) => peerConnection?.setLocalDescription(offer))
+          .then(() => {
+            socket?.send(
+              JSON.stringify({
+                type: WEBRTC_OFFER,
+                payload: peerConnection?.localDescription,
+              })
+            );
+          });
+      })
+      .catch((error) => console.error('Error accessing media devices.', error));
+  };
 
   const getTimer = (timeConsumed: number) => {
     const timeLeftMs = GAME_TIME_MS - timeConsumed;
@@ -334,6 +438,12 @@ export const Game = () => {
             </div>
           </div>
         </div>
+      </div>
+      {/* WebRTC video elements */}
+      <div className="video-container">
+        <h1></h1>
+        <video ref={localVideoRef} autoPlay muted className="local-video"></video>
+        <video ref={remoteVideoRef} autoPlay className="remote-video"></video>
       </div>
     </div>
   );

@@ -60,6 +60,16 @@ export class Game {
     }
   }
 
+  public getOpponentUserId(userId: string): string | null {
+    if (userId === this.player1UserId) {
+      return this.player2UserId;
+    }
+    if (userId === this.player2UserId) {
+      return this.player1UserId;
+    }
+    return null; 
+  }
+
   seedMoves(
     moves: {
       id: string;

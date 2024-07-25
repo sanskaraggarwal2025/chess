@@ -12,6 +12,9 @@ import {
   GAME_ADDED,
   GAME_ENDED,
   EXIT_GAME,
+  WEBRTC_OFFER,
+  WEBRTC_ANSWER,
+  WEBRTC_CANDIDATE
 } from './messages';
 import { Game, isPromoting } from './Game';
 import { db } from './db';
@@ -206,6 +209,32 @@ export class GameManager {
 
         socketManager.addUser(user, gameId);
       }
+
+      if ([WEBRTC_OFFER, WEBRTC_ANSWER, WEBRTC_CANDIDATE].includes(message.type)) {
+        this.handleWebRTCMessage(user, message);
+      }
     });
   }
+
+  private handleWebRTCMessage(user: User, message: any) {
+    const gameId = message.payload.gameId;
+    const game = this.games.find((g) => g.gameId === gameId);
+    if (!game) {
+      console.error('Game not found for WebRTC message');
+      return;
+    }
+
+    const opponentUserId = game.getOpponentUserId(user.userId);
+    const opponent = this.users.find((u) => u.userId === opponentUserId);
+
+    if (opponent) {
+      console.log(JSON.stringify(message), "protocol", 1);
+
+      opponent.socket.send(JSON.stringify(message));
+    } else {
+      console.error('Opponent not found for WebRTC message');
+    }
+  }
+
 }
+
